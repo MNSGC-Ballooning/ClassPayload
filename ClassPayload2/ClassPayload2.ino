@@ -1,3 +1,9 @@
+//This code is setup for an arduino mega with xbee, ublox GPS,
+//honeywell pressure, and a DALLAS temp sensor
+
+//Students of ME4090: You must change GPS code to be compatible with Adafruit Ultimate GPS
+//                    Use the GPS sample code in the arduino training to accomplish this
+
 #include <UbloxGPS.h>
 //#include <SoftwareSerial.h> // do not need when using a mega as it has dedicated serial ports
 #include <RelayXBee.h>

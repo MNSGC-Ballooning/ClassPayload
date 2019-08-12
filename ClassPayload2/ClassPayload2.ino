@@ -1,5 +1,5 @@
 #include <UbloxGPS.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h> // do not need when using a mega as it has dedicated serial ports
 #include <RelayXBee.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -11,22 +11,27 @@
 #define pressure_pin A12 // Honeywell pressure sensor data pin.
 #define temperature_pin 25 // DALLAS temperature sensor data pin
 #define sdLED_pin 10 // LED that indicates SD logging (YELLOW)
-#define chipSelect 53 // designated chipselect SD card pin on arduino mega. Plugs into 
+//#define chipSelect 53 //designated chipselect SD card pin on arduino mega. 
+#define chipSelect 8 // designated chipSelect pin when using Mega with sparkfun MicroSD shield
 #define xbeeLED_pin 12 // LED that indicates xbee radio communications (YELLOW)
 #define fixLED_pin 14 // LED that indicates ublox GPS fix
 #define altLED_pin 15 // LED that indicates whether altitude is logging as zero or not (not synonymous with fix)
 
 OneWire tempBus(temperature_pin);
-DallasTemperature temperature(&tempBus);
-UbloxGPS ublox = UbloxGPS(&ubloxSer); //Or &Serial1 if using teensy
-RelayXBee xbee = RelayXBee(&xbeeSer,"CP");
-boolean fix = false;
-boolean altBool = false;
+DallasTemperature temperature(&tempBus); 
+UbloxGPS ublox = UbloxGPS(&ubloxSer);
+String ID = "CP";                    // ****************************************** Change this to personalize your xbee ID. no two groups can have the same ID *****************
+RelayXBee xbee = RelayXBee(&xbeeSer,ID);
+boolean fix = false; // true if your GPS is connected, false if not
+boolean altBool = false; // 
 
-File datalog;
+String PANID = "000A"; // This will be the PANID used for all payloads on stack A
+//String PANID = "000B"; // This will be the PANID used for all payloads on stack B
+
+File datalog; 
 String data;
 String command;
-char datalogName[] = "ClassPayload00.csv";
+char datalogName[] = "ClassPayload00.csv"; // Don't change this please
 bool datalogOpen = false;
 int datacounter = 0;
 
@@ -38,40 +43,45 @@ void setup() {
 
 void ubloxSetup(){
  //Start serial
-  Serial.begin(9600);
+  Serial.begin(9600); //Make sure this matches the Baud rate when you open your Serial monitor
   pinMode(xbeeLED_pin,OUTPUT);
   pinMode(sdLED_pin,OUTPUT);
   pinMode(altLED_pin,OUTPUT);
   pinMode(fixLED_pin,OUTPUT);
   temperature.begin();
   //Start ublox
-  ubloxSer.begin(UBLOX_BAUD); //Serial1.begin(UBLOX.BAUD);
+  ubloxSer.begin(UBLOX_BAUD);
   
   while(!Serial){
     ; //Wait for serial port to connect
   }
   
   //Start GPS 
-  ublox.init();
+  ublox.init();                                          //*******************************************************************************************
   //Attempt to set to airborne 3 times. If successful, records result and breaks loop. If unsuccessful, saves warning and moves on
-  byte i = 0;
-  while (i<50) {
-    i++;
-    if (ublox.setAirborne()) {
-      Serial.println("Air mode successfully set.");
-      break;
-    }
-    else if (i ==50)
+  byte i = 0;                                            //*******************************************************************************************
+  while (i<50) {                                         //*******************************************************************************************
+    i++;                                                 //*******************************************************************************************
+    if (ublox.setAirborne()) {                           //*************** IF YOU ARE USING ADAFRUIT GPS THIS IS NOT NECESSARY ***********************
+      Serial.println("Air mode successfully set.");     //*******************************************************************************************
+      break;                                            //*******************************************************************************************
+    }                                                   //*******************************************************************************************
+    else if (i ==50)                                    //*******************************************************************************************
       Serial.println("WARNING: Failed to set to air mode (50 attemtps). Altitude data may be unreliable.");
-    else
+    else                                                //*******************************************************************************************
       Serial.println("Error: Air mode set unsuccessful. Reattempting...");
-  }
+  }                                                     //*******************************************************************************************
   Serial.println("GPS configured");
 }
 
 void xbeeSetup(){
   xbeeSer.begin(XBEE_BAUD);
   xbee.init('A');
+  xbee.enterATmode();
+  xbee.atCommand("ATID" + PANID);// Sets the PANID based on what stack the payload is on.
+  xbee.atCommand("ATDL0"); 
+  xbee.atCommand("ATMY1");
+  xbee.exitATmode();
   Serial.println("Xbee Initialized");
 }
 
@@ -175,6 +185,12 @@ void updateXbee() {
     delay(100);
     digitalWrite(xbeeLED_pin,LOW);
     }
+  else if (command.equals("ping"))
+  {
+    xbee.send("I'm still alive but i'm barely breathin'!"); // personalize this to say whatever
+    delay(100);
+    digitalWrite(xbeeLED_pin,LOW);
+  }
   else{xbee.send("ERROR. Cannot identify command: " + command);} // notice the delay and LED flip is not added. Look for more than a second long xbee blink to indicate message error.
 }
 
@@ -192,5 +208,5 @@ double pressure(){
 }
 void loop() {
   getUbloxData();
-  //updateXbee();
+  updateXbee();
 }
